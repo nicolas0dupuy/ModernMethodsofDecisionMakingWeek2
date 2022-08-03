@@ -123,7 +123,7 @@ public:
         }
     }
 
-    void MyFindClique(int iterations, int upweight_unvisited = 1, int scale_iter = 1, int max_weight = 1000, int verbose = 0, int test = 0)
+    void MyFindClique(int iterations, int upweight_unvisited = 0, float alpha1 = 1.1, float alpha2 = 0.9, int verbose = 0, int test = 0)
         {
             /*
             upweight_unvisited : increment at the end of each iteration of the weights for unvisited vertices
@@ -134,11 +134,9 @@ public:
             // We define a weight vector for the probability of an edge to be picked
             vector<int> weights(neighbour_sets.size());
             for (int i=0; i < weights.size(); i++)
-            // initialize the probability to the edge degree
+                // initialize the probability to the edge degree
                 // weights[i] = neighbour_sets[i].size() + 1; 
                 weights[i] = 1;
-
-            int last_best_iter = 0;
 
             for (int iteration = 0; iteration < iterations; ++iteration)
             {
@@ -160,6 +158,7 @@ public:
                         --i;
                     }
                 }
+                
                 while (! candidates.empty())
                 {
                     // Get the total weight for remaining candidates
@@ -172,6 +171,7 @@ public:
                     int rnd = 0;
                     // Find the last edge so that the sum of weights before it is < to t
                     // Leads to a weighted probability
+                    shuffle(candidates.begin(), candidates.end(), generator);
                     sum += weights[candidates[rnd]];
                     while (sum < t)
                     {
@@ -214,31 +214,34 @@ public:
                 if (clique.size() > best_clique.size())
                 {
                     best_clique = clique;
-                    last_best_iter = iteration;
                 }
                 // increment weights of unvisited edges (all weights updated, then the next loop downgrade visited edges)
                 // allows for exploration
-                int max_div = min(iterations, 1000);
-                int to_add = upweight_unvisited * 
-                    (scale_iter * min(10,
-                                            max(1,
-                                                      (int)((iterations - iteration)/(max_div)))));
-                int score = (clique.size() - best_clique.size()) * to_add;
+                int score = (clique.size() - best_clique.size());
+                if (score > 0)
+                {
+                    score *= alpha1;
+                    alpha1 *= alpha1;
+                }
+                if (score < 0)
+                {
+                    score *= alpha2;
+                    alpha2 *= alpha2;
+                }
                 for (int i = 0; i < weights.size(); i++)
                 {
-                    weights[i] += to_add;
-                    if (weights[i] > max_weight)
-                        weights[i] = max_weight;
-                }
+                    int is_in_clique = 0;
+                    for (int j = 0; j < clique.size(); j++)
+                    {
+                        if (i == clique[j])
+                            {
+                                is_in_clique = 1;
+                                weights[clique[i]] += score;
+                            }
+                    }
+                    if (! is_in_clique)
+                        weights[i] += upweight_unvisited;
 
-                for (int i = 0; i < clique.size(); i++)
-                {
-                    weights[clique[i]] += score - to_add;
-                    if (weights[clique[i]] < 1)
-                        weights[clique[i]] = 1;
-                    
-                    if (weights[clique[i]] > max_weight)
-                        weights[clique[i]] = max_weight;
                 }
             }
         }
