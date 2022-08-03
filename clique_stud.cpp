@@ -7,6 +7,7 @@
 #include <random>
 #include <unordered_set>
 #include <algorithm>
+#include <cstdlib>
 using namespace std;
 
 
@@ -122,8 +123,12 @@ public:
         }
     }
 
-    void MyFindClique(int iterations, int verbose = 0, int test = 0)
+    void MyFindClique(int iterations, int upweight_unvisited = 1, int scale_iter = 1, int max_weight = 1000, int verbose = 0, int test = 0)
         {
+            /*
+            upweight_unvisited : increment at the end of each iteration of the weights for unvisited vertices
+            scale_iter : coef to add importance to first scores (int)(scale_iter * (iterations - current iteration)/iterations)
+            */
             static mt19937 generator;
             // Variation inspired by Adaptative starting ... FIND BACK QUOTE NAME !!!
             // We define a weight vector for the probability of an edge to be picked
@@ -132,6 +137,8 @@ public:
             // initialize the probability to the edge degree
                 // weights[i] = neighbour_sets[i].size() + 1; 
                 weights[i] = 1;
+
+            int last_best_iter = 0;
 
             for (int iteration = 0; iteration < iterations; ++iteration)
             {
@@ -192,13 +199,6 @@ public:
                         cout << i << " ";
                     cout << endl;
                 }
-                int score = (clique.size() - best_clique.size());
-                for (int i = 0; i < clique.size(); i++)
-                {
-                    weights[clique[i]] += score;
-                    if (weights[clique[i]] < 1)
-                        weights[clique[i]] = 1;
-                }
                 /*
                 if (test)
                 {
@@ -214,6 +214,31 @@ public:
                 if (clique.size() > best_clique.size())
                 {
                     best_clique = clique;
+                    last_best_iter = iteration;
+                }
+                // increment weights of unvisited edges (all weights updated, then the next loop downgrade visited edges)
+                // allows for exploration
+                int max_div = min(iterations, 1000);
+                int to_add = upweight_unvisited * 
+                    (scale_iter * min(10,
+                                            max(1,
+                                                      (int)((iterations - iteration)/(max_div)))));
+                int score = (clique.size() - best_clique.size()) * to_add;
+                for (int i = 0; i < weights.size(); i++)
+                {
+                    weights[i] += to_add;
+                    if (weights[i] > max_weight)
+                        weights[i] = max_weight;
+                }
+
+                for (int i = 0; i < clique.size(); i++)
+                {
+                    weights[clique[i]] += score - to_add;
+                    if (weights[clique[i]] < 1)
+                        weights[clique[i]] = 1;
+                    
+                    if (weights[clique[i]] > max_weight)
+                        weights[clique[i]] = max_weight;
                 }
             }
         }
@@ -250,11 +275,44 @@ private:
     vector<int> best_clique;
 };
 
-int main()
+int main(int argc, char *argv[])
 {
-    int iterations;
+    int iterations = 100;
+    int upweight_unvisited = 1;
+    int scale_iter = 1;
+    int max_weight = 1000;
+    int verbose = 0;
+    int test = 0;
+    if (argc > 1)
+    {
+        for (int i = 1; i < argc; i++)
+        {
+            if(i == 1)
+                iterations = atoi(argv[i]);
+            if(i == 2)
+                upweight_unvisited = atoi(argv[i]);
+            if(i == 3)
+                scale_iter = atoi(argv[i]);
+            if (i == 4)
+                max_weight = atoi(argv[i]);
+            if (i == 5)
+                verbose = atoi(argv[i]);
+            if (i == 6)
+                test = atoi(argv[i]);
+            }
+    }
+    cout << "USAGE :" << endl;
+    cout << "1st argument : Niter : " << iterations << endl;
+    cout << "2nd argument : increment value for unvisited edges : " << upweight_unvisited<< endl;
+    cout << "3rd argument : scale_iter : " << scale_iter << endl;
+    cout << "3rd argument : max_weight : " << max_weight << endl;
+    cout << "4th argument : verbose" << endl;
+    cout << "5th argument : test (unimplemented yet)" << endl;
+    cout << "    ****    ****    ****    ****    ****    ****    ****" << endl;
+    /*
     cout << "Number of iterations: ";
     cin >> iterations;
+    */
     /*
     int randomization;
     cout << "Randomization: ";
@@ -275,7 +333,7 @@ int main()
         MaxCliqueProblem problem;
         problem.ReadGraphFile(file);
         clock_t start = clock();
-        problem.MyFindClique(iterations, 0, 0);
+        problem.MyFindClique(iterations, upweight_unvisited, scale_iter, max_weight, verbose, test);
         if (! problem.Check())
         {
             cout << "*** WARNING: incorrect clique ***\n";
