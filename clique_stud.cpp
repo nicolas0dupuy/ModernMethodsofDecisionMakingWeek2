@@ -130,7 +130,8 @@ public:
             vector<int> weights(neighbour_sets.size());
             for (int i=0; i < weights.size(); i++)
             // initialize the probability to the edge degree
-                weights[i] = neighbour_sets[i].size(); 
+                // weights[i] = neighbour_sets[i].size() + 1; 
+                weights[i] = 1;
 
             for (int iteration = 0; iteration < iterations; ++iteration)
             {
@@ -156,6 +157,7 @@ public:
                 {
                     // Get the total weight for remaining candidates
                     int total_weights = 0;
+                    last = candidates.size() - 1;
                     for (int i = 0; i < candidates.size(); i++)
                         total_weights += weights[candidates[i]];
                     int t = GetRandom(0, total_weights);
@@ -197,6 +199,7 @@ public:
                     if (weights[clique[i]] < 1)
                         weights[clique[i]] = 1;
                 }
+                /*
                 if (test)
                 {
                     best_clique = clique;
@@ -207,7 +210,8 @@ public:
                         return;
                     }
                 }
-                else if (clique.size() > best_clique.size())
+                */
+                if (clique.size() > best_clique.size())
                 {
                     best_clique = clique;
                 }
@@ -271,7 +275,7 @@ int main()
         MaxCliqueProblem problem;
         problem.ReadGraphFile(file);
         clock_t start = clock();
-        problem.MyFindClique(iterations, 1, 1);
+        problem.MyFindClique(iterations, 0, 0);
         if (! problem.Check())
         {
             cout << "*** WARNING: incorrect clique ***\n";
