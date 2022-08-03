@@ -123,7 +123,7 @@ public:
         }
     }
 
-    void MyFindClique(int iterations, int upweight_unvisited = 0, float alpha1 = 1.1, float alpha2 = 0.9, int verbose = 0, int test = 0)
+    void MyFindClique(int iterations, int upweight_unvisited = 0, float alpha1 = 1.01, float alpha2 = 0.99, int drop_proba = 1, int verbose = 0, int test = 0)
         {
             /*
             upweight_unvisited : increment at the end of each iteration of the weights for unvisited vertices
@@ -134,9 +134,12 @@ public:
             // We define a weight vector for the probability of an edge to be picked
             vector<int> weights(neighbour_sets.size());
             for (int i=0; i < weights.size(); i++)
-                // initialize the probability to the edge degree
-                // weights[i] = neighbour_sets[i].size() + 1; 
                 weights[i] = 1;
+            vector<int> initial_vertex;
+            while (! initial_vertex.empty())
+            {
+                initial_vertex.pop_back();
+            }
 
             for (int iteration = 0; iteration < iterations; ++iteration)
             {
@@ -158,11 +161,29 @@ public:
                         --i;
                     }
                 }
-                
+                // removing candidates from initial vertices
+                for (int i = 0; i < initial_vertex.size(); i++)
+                {
+                    int vertex = initial_vertex[i];
+                    
+                    for (int c = 0; c < candidates.size(); ++c)
+                        {
+                            int candidate = candidates[c];
+                            if (neighbour_sets[vertex].count(i) == 0)
+                            {
+                                // Move the candidate to the end and pop it
+                                swap(candidates[c], candidates[last]);
+                                candidates.pop_back();
+                                --c;
+                            }
+                        }
+                    
+                }
                 while (! candidates.empty())
                 {
                     // Get the total weight for remaining candidates
                     int total_weights = 0;
+
                     last = candidates.size() - 1;
                     for (int i = 0; i < candidates.size(); i++)
                         total_weights += weights[candidates[i]];
@@ -199,50 +220,67 @@ public:
                         cout << i << " ";
                     cout << endl;
                 }
-                /*
-                if (test)
-                {
-                    best_clique = clique;
-
-                    if (! Check())
-                    {
-                        cout << "Not a clique ! Stopping" << endl;
-                        return;
-                    }
-                }
-                */
-                if (clique.size() > best_clique.size())
-                {
-                    best_clique = clique;
-                }
-                // increment weights of unvisited edges (all weights updated, then the next loop downgrade visited edges)
-                // allows for exploration
                 int score = (clique.size() - best_clique.size());
                 if (score > 0)
                 {
-                    score *= alpha1;
+                    score = (int)(score * alpha1);
                     alpha1 *= alpha1;
+                    if (alpha1 > 10.)
+                        alpha1 = 10.;
                 }
                 if (score < 0)
                 {
-                    score *= alpha2;
+                    score = (int)(score * alpha2);
+                    
                     alpha2 *= alpha2;
+                    if (alpha2 < 0.1)
+                        alpha2 = 0.1;
                 }
                 for (int i = 0; i < weights.size(); i++)
                 {
                     int is_in_clique = 0;
                     for (int j = 0; j < clique.size(); j++)
                     {
-                        if (i == clique[j])
+                        if (i+1 == clique[j])
                             {
                                 is_in_clique = 1;
-                                weights[clique[i]] += score;
+                                weights[i] += score;
                             }
                     }
                     if (! is_in_clique)
                         weights[i] += upweight_unvisited;
-
+                    if (weights[i] < 1)
+                        weights[i] = 1;
+                    if (weights[i] > 1000)
+                        weights[i] = 1000;
                 }
+                if (clique.size() >= best_clique.size())
+                {
+                    best_clique = clique;
+                    for (int vertex : clique)
+                    {
+                        // cout << "Adding vertex " << vertex << endl;
+                        initial_vertex.push_back(vertex);
+                    }
+                }
+                for (int i = 0; i < initial_vertex.size(); ++i)
+                {
+                    int t = GetRandom(0, drop_proba);
+                    if (t == 0)
+                    {
+                        swap(initial_vertex[i], initial_vertex[initial_vertex.size() - 1]);
+                        initial_vertex.pop_back();
+                        --i;
+                    }
+                }
+                /*
+                cout << "New initial set of vertices : " << endl;
+                for (int i = 0; i < initial_vertex.size(); i++)
+                {
+                    cout << initial_vertex[i] << " ";
+                }
+                cout << endl;
+                */
             }
         }
 
@@ -282,8 +320,9 @@ int main(int argc, char *argv[])
 {
     int iterations = 100;
     int upweight_unvisited = 1;
-    int scale_iter = 1;
-    int max_weight = 1000;
+    float alpha1 = 1.1;
+    float alpha2 = 0.9;
+    int drop_proba = 1;
     int verbose = 0;
     int test = 0;
     if (argc > 1)
@@ -293,25 +332,28 @@ int main(int argc, char *argv[])
             if(i == 1)
                 iterations = atoi(argv[i]);
             if(i == 2)
-                upweight_unvisited = atoi(argv[i]);
+                upweight_unvisited = atoi(argv[i]);    
             if(i == 3)
-                scale_iter = atoi(argv[i]);
-            if (i == 4)
-                max_weight = atoi(argv[i]);
-            if (i == 5)
-                verbose = atoi(argv[i]);
+                alpha1 = atof(argv[i]);
+            if(i == 4)
+                alpha2 = atof(argv[i]);
+            if(i == 5)
+                drop_proba = atoi(argv[i]);
             if (i == 6)
+                verbose = atoi(argv[i]);
+            if (i == 7)
                 test = atoi(argv[i]);
             }
     }
     cout << "USAGE :" << endl;
     cout << "1st argument : Niter : " << iterations << endl;
     cout << "2nd argument : increment value for unvisited edges : " << upweight_unvisited<< endl;
-    cout << "3rd argument : scale_iter : " << scale_iter << endl;
-    cout << "3rd argument : max_weight : " << max_weight << endl;
-    cout << "4th argument : verbose" << endl;
-    cout << "5th argument : test (unimplemented yet)" << endl;
-    cout << "    ****    ****    ****    ****    ****    ****    ****" << endl;
+    cout << "3rd argument : alpha1 : " << alpha1 << endl;
+    cout << "4rd argument : alpha2 : " << alpha2 << endl;
+    cout << "5rd argument : drop_proba : " << drop_proba << endl;
+    cout << "6th argument : verbose" << endl;
+    cout << "7th argument : test (unimplemented yet)" << endl;
+    cout << "    ****    ****    ****    ****    ****    ****    ****" << endl << endl;
     /*
     cout << "Number of iterations: ";
     cin >> iterations;
@@ -321,29 +363,30 @@ int main(int argc, char *argv[])
     cout << "Randomization: ";
     cin >> randomization;
     */
-    /*
+    
     vector<string> files = { "C125.9.clq", "johnson8-2-4.clq", "johnson16-2-4.clq", "MANN_a9.clq", "MANN_a27.clq",
         "p_hat1000-1.clq", "keller4.clq", "hamming8-4.clq", "brock200_1.clq", "brock200_2.clq", "brock200_3.clq", "brock200_4.clq",
         "gen200_p0.9_44.clq", "gen200_p0.9_55.clq", "brock400_1.clq", "brock400_2.clq", "brock400_3.clq", "brock400_4.clq",
         "MANN_a45.clq", "sanr400_0.7.clq", "p_hat1000-2.clq", "p_hat500-3.clq", "p_hat1500-1.clq", "p_hat300-3.clq", "san1000.clq",
         "sanr200_0.9.clq" };
-    */
-    vector<string> files = {"brock200_1.clq"};
+    
+    // vector<string> files = {"brock200_1.clq"};
     ofstream fout("clique.csv");
     fout << "File; Clique; Time (sec)\n";
     for (string file : files)
     {
+        cout << endl << "NEW PROBLEM" << endl;
         MaxCliqueProblem problem;
         problem.ReadGraphFile(file);
         clock_t start = clock();
-        problem.MyFindClique(iterations, upweight_unvisited, scale_iter, max_weight, verbose, test);
+        problem.MyFindClique(iterations, upweight_unvisited, alpha1, alpha2, drop_proba, verbose, test);
         if (! problem.Check())
         {
             cout << "*** WARNING: incorrect clique ***\n";
             fout << "*** WARNING: incorrect clique ***\n";
         }
-        fout << file << "; " << problem.GetClique().size() << "; " << double(clock() - start) / 1000 << '\n';
-        cout << file << ", result - " << problem.GetClique().size() << ", time - " << double(clock() - start) / 1000 << '\n';
+        fout << file << "; " << problem.GetClique().size() << "; " << double(clock() - start) / 1000000 << '\n';
+        cout << file << ", result - " << problem.GetClique().size() << ", time - " << double(clock() - start) / 1000000 << '\n';
         cout << "{" ;
         for (int i : problem.GetClique())
             cout << i << " ";
